@@ -1,0 +1,5 @@
+name: StockBot
+description: Server side
+dependencies:
+  html5lib: any
+  sqljocky: any
