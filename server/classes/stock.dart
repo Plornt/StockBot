@@ -73,6 +73,13 @@ class Stock {
   
   Future<bool> updateDB (DatabaseHandler dbh) {
     Completer c = new Completer();
+    Future.wait([updateInfoDatabase(dbh), updateQuarterHourStockPrices(dbh)]).then((List<bool> vals) { 
+      c.complete(vals.every((e) { return e == true; }));
+    });
+    return c.future;
+  }
+  Future<bool> updateInfoDatabase (DatabaseHandler dbh) { 
+    Completer c = new Completer();
     dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares)"
                         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
                         "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost), sharesForSale = VALUES(sharesForSale), totalShares = VALUES(totalShares)"
@@ -92,10 +99,10 @@ class Stock {
     if (updatedStockPrice == false) {
       DateTime now = new DateTime.now();
       DateTime prev15Mins = new DateTime.fromMillisecondsSinceEpoch((now.millisecondsSinceEpoch - (now.millisecondsSinceEpoch % 900000)));
-      dbh.prepareExecute("SELECT COUNT(*) FROM stockprices WHERE stock_id = ? AND lastUpdate >= ?", [id, prev15Mins]).then((Results res) { 
+      dbh.prepareExecute("SELECT COUNT(*) FROM stockprices WHERE stock_id = ? AND updateTime >= ?", [id, prev15Mins.millisecondsSinceEpoch]).then((Results res) { 
         res.first.then((Row row) { 
           if (row[0] == 0) {
-            dbh.prepareExecute("INSERT INTO stockprices (stock_id, cost, totalShares, sharesForSale, updateTime) VALUES (?, ?, ?, ?, ?)",[id, currentPrice, totalShares, sharesForSale, prev15Mins]).then((Results res) { 
+            dbh.prepareExecute("INSERT INTO stockprices (stock_id, cost, totalShares, sharesForSale, updateTime) VALUES (?, ?, ?, ?, ?)",[id, currentPrice, totalShares, sharesForSale, prev15Mins.millisecondsSinceEpoch]).then((Results res) { 
               if (res.insertId != null) {
                 updatedStockPrice = true;
                 c.complete(true);
