@@ -51,15 +51,17 @@ class Stock {
       c.complete(TimedStockData.get(this.id, timeFrom, timeTo));
     }
     else {
-      dbh.prepareExecute("SELECT updateTime, cost, sharesForSale FROM stockprices WHERE stock_id=? AND updateTime >= ? AND updateTime <= ?",[id, timeFrom, (timeTo != null ? timeTo.millisecondsSinceEpoch : new DateTime.now().millisecondsSinceEpoch)])
+      dbh.prepareExecute("SELECT updateTime, cost, sharesForSale FROM stockprices WHERE stock_id=? AND updateTime >= ? AND updateTime <= ?",[id, timeFrom.millisecondsSinceEpoch, (timeTo != null ? timeTo.millisecondsSinceEpoch : new DateTime.now().millisecondsSinceEpoch)])
         .then((Results res) {
           TimedStockData tsd = new TimedStockData(id, timeFrom, timeTo);
           List<StockData> dat = new List<StockData>();
           print("Retreiving Data");
-          res.listen((Row data) { 
+          res.listen((Row data) {
+            print("A row!");
             dat.add(new StockData(new DateTime.fromMillisecondsSinceEpoch(data[0]), data[1], data[2]));
           }).onDone(() { 
             tsd._data = dat;
+            print("Added data ${dat.length}");
             c.complete(tsd);
           });
         });
@@ -145,9 +147,11 @@ class Stock {
               }
             });
           }
+          else c.complete(true);
         });
       });
     }
+    else c.complete(true);
     return c.future;
   }
  

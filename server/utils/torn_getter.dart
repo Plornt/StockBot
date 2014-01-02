@@ -61,6 +61,7 @@ class TornGetter {
     Map<String, String> postData = req.postData;
     Completer c = req.c;
     void requestSent (HttpClientResponse html) {
+      print("Got response: $url");
       String htmlData = "";
       html.transform(new Utf8Decoder(allowMalformed: true)).listen((String data) {
         htmlData += data;
