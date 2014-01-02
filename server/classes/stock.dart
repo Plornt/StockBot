@@ -38,6 +38,13 @@ class Stock {
     else return new Stock._create(ID);
   }
   
+  Future<TimedStockData> getTransactionsBackFrom (DatabaseHandler dbh, Duration timeOffset) {
+    DateTime now = new DateTime.now();
+    DateTime timeSince = new DateTime.fromMillisecondsSinceEpoch((now.millisecondsSinceEpoch - (now.millisecondsSinceEpoch % 900000)) - timeOffset.inMilliseconds);
+    return getTimeRange(dbh, timeSince);
+  }
+  
+  // TODO: PROPER CACHING OF STOCK DATA SO IT CAN PEICE TOGETHER USING OTHER CACHES RATHER THAN REQUERYING.
   Future<TimedStockData> getTimeRange (DatabaseHandler dbh, DateTime timeFrom, [DateTime timeTo]) {
     Completer<TimedStockData> c = new Completer();
     if (TimedStockData.exists(this.id, timeFrom, timeTo)) {
@@ -48,6 +55,7 @@ class Stock {
         .then((Results res) {
           TimedStockData tsd = new TimedStockData(id, timeFrom, timeTo);
           List<StockData> dat = new List<StockData>();
+          print("Retreiving Data");
           res.listen((Row data) { 
             dat.add(new StockData(new DateTime.fromMillisecondsSinceEpoch(data[0]), data[1], data[2]));
           }).onDone(() { 
@@ -211,12 +219,12 @@ class TimedStockData {
   }
   
   static String createKey (int stockID, DateTime timeFrom, [DateTime timeTo]) {
-    return "$stockID:${timeFrom.millisecondsSinceEpoch}:${timeTo == null ? timeTo.millisecondsSinceEpoch : true}";
+    return "$stockID:${timeFrom.millisecondsSinceEpoch}:${timeTo != null ? timeTo.millisecondsSinceEpoch : true}";
   }
-  static exists (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+  static bool exists (int stockID, DateTime timeFrom, [DateTime timeTo]) {
     return _cache.containsKey(createKey (stockID, timeFrom, timeTo));
   }
-  static get (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+  static TimedStockData get (int stockID, DateTime timeFrom, [DateTime timeTo]) {
     return _cache[createKey (stockID, timeFrom, timeTo)];
   }
   toJson () {

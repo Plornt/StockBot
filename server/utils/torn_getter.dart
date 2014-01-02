@@ -57,6 +57,7 @@ class TornGetter {
   
   Future<String> _doRequest (Request req) {
     String url = req.url;
+    print("Getting: $url");
     Map<String, String> postData = req.postData;
     Completer c = req.c;
     void requestSent (HttpClientResponse html) {
@@ -91,6 +92,7 @@ class TornGetter {
     if (postData == null) {
       client.getUrl(Uri.parse(url)).then((HttpClientRequest request) {
         request.cookies.addAll(this.cookies);
+        request.headers.set("User-Agent", "Toms Chrome Extension. Please contact Tom[1799359] in-game if this extension is causing issues.");
         return request.close();
       })
       .then((HttpClientResponse response) { 
@@ -108,6 +110,7 @@ class TornGetter {
         });
         req.cookies.addAll(cookies);
         req.contentLength = sb.toString().length;
+        req.headers.set("User-Agent", "Toms Chrome Extension. Please contact Tom[1799359] in-game if this extension is causing issues.");
         req.headers.set("Content-Type", "application/x-www-form-urlencoded");
         req.write(sb);
         return req.close();

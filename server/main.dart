@@ -17,12 +17,18 @@ DatabaseHandler dbh = new DatabaseHandler(new ConnectionPool(host: 'localhost', 
 void main () {
   
   TornGetter tg = new TornGetter(username: "Plorntus", password: "roflman1", selfLogin: false, PHPSESSID: "f2e27838f371222286d9b90a260640b9");
+  JsonEncoder encoder = new JsonEncoder();
   Stock.init(dbh).then((done) { 
     print("Fetching data");
     Stock._STOCKS.forEach((int id, Stock tcsb) {
       tcsb.fetchLatestData(tg).then((done) { 
         tcsb.updateDB(dbh).then((d) { 
           print("Updated DB");
+          if (tcsb.id == 1) {
+            tcsb.getTransactionsBackFrom(dbh, new Duration(days: 7)).then((TimedStockData data) { 
+               print(encoder.convert(data));
+            });
+          }
         });
       });
     });
