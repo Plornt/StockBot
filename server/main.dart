@@ -51,15 +51,14 @@ class TornGetter {
     Completer c = new Completer();
     void requestSent (HttpClientResponse html) {
       String htmlData = "";
-      print("Req done");
-      html.transform(new Utf8Decoder()).listen((String data) {
+      print("got data");
+      html.transform(new Utf8Decoder(allowMalformed: true)).listen((String data) {
         htmlData += data;
       }).onDone(() {
         if (!htmlData.contains("You are no longer logged in")) {
                  c.complete(htmlData);
         }
         else {
-          print(htmlData);
           tryLogin(3, 0).then((val) { 
             if (val) {
               return this._doRequest(url, postData: postData);
@@ -104,12 +103,12 @@ class TornGetter {
   Future<bool> tryLogin (int MaxAttempts, int AttemptNumber, [Completer c]) {
     if (c == null) c = new Completer();
     this.login().then((val) { 
-      print("Trying login");
       if (val == true) {
         c.complete(true);
       }
       else {
         if (AttemptNumber < MaxAttempts) {
+          print("[${AttemptNumber+1}/$MaxAttempts] Could not login. Retrying...");
           tryLogin(MaxAttempts, AttemptNumber + 1, c);
         }
         else c.complete(false);
@@ -120,7 +119,6 @@ class TornGetter {
   
   Future<bool> login () {
     Completer c = new Completer();
-    print("Trying login");
     this._doRequest("http://www.torn.com/authenticate.php", postData: { 
       'player': this.username,
       'password': this.password
@@ -141,9 +139,21 @@ class TornGetter {
 
 class Stock {
   int id = 0;
-  Map<int, Stock> _STOCKS = new Map<int, Stock>();
+  static Map<int, Stock> _STOCKS = new Map<int, Stock>();
+  String acronym = "";
+  String name = "";
+  String info = "";
+  String director = "";
+  String marketCap = "";
+  num totalShares = 0;
+  num sharesForSale = 0;
+  String demand = "";
+  String forecast = "";
+  bool errored = false;
   
-  Stock._create (int ID);
+  Stock._create (this.id) {
+    _STOCKS[id] = this;
+  }
   
   factory Stock (int ID) { 
     if (_STOCKS.containsKey(ID)) {
@@ -156,8 +166,56 @@ class Stock {
     
   }
   
-  Future<bool> fetchLatestData (DateTime lastUpdate) {
-    
+  Future<bool> fetchLatestData (TornGetter tg, DateTime lastUpdate) {
+    Completer c = new Completer();
+    tg.request("http://www.torn.com/stockexchange.php?step=profile&stock=$id").then((data) { 
+      String selector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD > TABLE";
+      Document parsed = parser.parse(data);
+      List<Element> pricesTables = childQuerySelector(parsed.body ,selector);
+      print(parsed.body.innerHtml);
+      try { 
+        // Acronym
+        String acronymSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1)";
+        this.acronym = childQuerySelector(parsed.body, acronymSelector)[0].innerHtml;    
+        
+        // Name
+        String nameSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > CENTER:eq(0) > FONT:eq(0) > B:eq(0)";
+        this.name = childQuerySelector(parsed.body, nameSelector)[0].innerHtml;  
+        
+        // Info
+        String infoSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0)";
+        this.info = childQuerySelector(parsed.body, infoSelector)[0].innerHtml;  
+        
+        // Director
+        String directorSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(1)";
+        this.director = childQuerySelector(parsed.body, directorSelector)[0].innerHtml;  
+        
+        // M Cap
+        String marketCapSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(1)";
+        this.marketCap = childQuerySelector(parsed.body, marketCapSelector)[0].innerHtml;  
+        
+        // Total S
+        String totalSharesSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";
+        this.totalShares = num.parse(childQuerySelector(parsed.body, totalSharesSelector)[0].innerHtml.replaceAll(",", ""));
+        
+        // S For S
+        String sharesForSaleSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(6) > TD:eq(1)";
+        this.sharesForSale = num.parse(childQuerySelector(parsed.body, sharesForSaleSelector)[0].innerHtml.replaceAll(",", ""));
+        // Demand
+        String demandSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";    
+        this.demand = childQuerySelector(parsed.body, demandSelector)[0].innerHtml;
+        
+        // Forecast 
+        String forecastSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";
+        this.forecast = childQuerySelector(parsed.body, forecastSelector)[0].innerHtml;
+        c.complete(true);
+      }
+      catch (e) {
+        c.completeError(e);
+        this.errored = true;
+      }
+    }).catchError(c.completeError);
+    return c.future;
   }
 }
 
@@ -209,15 +267,9 @@ List<Element> childQuerySelector (Element doc, String selector) {
 
 void main () {
   print("Getting");
-  TornGetter tg = new TornGetter(username: "Plorntus", password: "rssssoflmssssssan1");
-  tg.request("http://www.torn.com/stockexchange.php?step=profile&stock=0").then((data) { 
-    String selector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD > TABLE";
-    Document parsed = parser.parse(data);
-    List<Element> el = childQuerySelector(parsed.body ,selector);
-    el.forEach((Element table) { 
-      print(table.innerHtml);
-    });
-  }).catchError((err) { 
-    print(err);
+  TornGetter tg = new TornGetter(username: "Plorntus", password: "roflman1");
+  Stock tcsb = new Stock(1);
+  tcsb.fetchLatestData(tg, new DateTime.now()).then((dat) { 
+    print(tcsb.demand);
   });
 }
