@@ -14,6 +14,8 @@ class Stock {
   String marketCap = "";
   String demand = "";
   String forecast = "";
+  String benefit = "";
+  num benefitShares = 0;
   num totalShares = 0;
   num sharesForSale = 0;
   num currentPrice = 0;
@@ -23,6 +25,7 @@ class Stock {
   DateTime minDate;
   num min = 0;
   
+  DateTime lastUpdate;
   
   Stock._create (this.id) {
     _STOCKS[id] = this;
@@ -67,13 +70,47 @@ class Stock {
     return c.future;
   }
   
-  Future<bool> insertIntoDb (DatabaseHandler dbh) {
-    
+  Future<bool> updateDB (DatabaseHandler dbh) {
+    Completer c = new Completer();
+    dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
+                        "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost)"
+        ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice]).then((Results res) { 
+          if (res.affectedRows < 3) {
+            c.complete(true);
+          }
+          else {
+            c.completeError("Affected Rows: ${res.affectedRows}");
+          }
+        }).catchError(c.completeError);
+    return c.future;
   }
-  
-  
+ 
   toJson () {
     return { 'id': id, 'currentPrice':currentPrice, 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
+  }
+  
+  static Future<bool> init (DatabaseHandler dbh) {
+    Completer c = new Completer();
+    dbh.query("SELECT stock_id, acro, name, benefit, benefit_shares, min, minDate,max, maxDate, lastUpdate, info, currentCost FROM `general`").then((Results res) { 
+                res.listen((Row stockRow) { 
+                  Stock s = new Stock(stockRow[0]);
+                  s.acronym = stockRow[1].toString();
+                  s.name = stockRow[2].toString();
+                  s.benefit = stockRow[3].toString();
+                  s.benefitShares = stockRow[4];
+                  s.min = stockRow[5];
+                  s.minDate = new DateTime.fromMillisecondsSinceEpoch(stockRow[6] == null ? 0 : stockRow[6]);
+                  s.max = stockRow[7];
+                  s.maxDate = new DateTime.fromMillisecondsSinceEpoch(stockRow[8] == null ? 0 : stockRow[6]);
+                  s.lastUpdate = new DateTime.fromMillisecondsSinceEpoch(stockRow[9] == null ? 0 : stockRow[6]);
+                  s.info = stockRow[10].toString();
+                  s.currentPrice = stockRow[11];
+                }).onDone(() { 
+                  c.complete(true);
+                });
+              });
+    return c.future;
   }
 }
 
