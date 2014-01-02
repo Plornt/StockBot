@@ -24,7 +24,7 @@ class Stock {
   num max = 0;
   DateTime minDate;
   num min = 0;
-  
+  bool updatedStockPrice = false;
   DateTime lastUpdate;
   
   Stock._create (this.id) {
@@ -49,6 +49,7 @@ class Stock {
       Document parsed = parser.parse(data);
       
       try { 
+        updatedStockPrice = false;
         this.currentPrice =  num.parse(childQuerySelector(parsed.body, STOCK_SELECTORS.STOCK_COST)[0].innerHtml.replaceAll(",", "").replaceAll(r"$", ""), (e) { return 0; });
         this.acronym = childQuerySelector(parsed.body, STOCK_SELECTORS.ACRONYM)[0].innerHtml;    
         this.name = childQuerySelector(parsed.body, STOCK_SELECTORS.NAME)[0].innerHtml;  
@@ -72,10 +73,10 @@ class Stock {
   
   Future<bool> updateDB (DatabaseHandler dbh) {
     Completer c = new Completer();
-    dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
-                        "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost)"
-        ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice]).then((Results res) { 
+    dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
+                        "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost), sharesForSale = VALUES(sharesForSale), totalShares = VALUES(totalShares)"
+        ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice, sharesForSale, totalShares]).then((Results res) { 
           if (res.affectedRows < 3) {
             c.complete(true);
           }
@@ -83,6 +84,30 @@ class Stock {
             c.completeError("Affected Rows: ${res.affectedRows}");
           }
         }).catchError(c.completeError);
+    
+    return c.future;
+  }
+  Future<bool> updateQuarterHourStockPrices (DatabaseHandler dbh) {
+    Completer c = new Completer();
+    if (updatedStockPrice == false) {
+      DateTime now = new DateTime.now();
+      DateTime prev15Mins = new DateTime.fromMillisecondsSinceEpoch((now.millisecondsSinceEpoch - (now.millisecondsSinceEpoch % 900000)));
+      dbh.prepareExecute("SELECT COUNT(*) FROM stockprices WHERE stock_id = ? AND lastUpdate >= ?", [id, prev15Mins]).then((Results res) { 
+        res.first.then((Row row) { 
+          if (row[0] == 0) {
+            dbh.prepareExecute("INSERT INTO stockprices (stock_id, cost, totalShares, sharesForSale, updateTime) VALUES (?, ?, ?, ?, ?)",[id, currentPrice, totalShares, sharesForSale, prev15Mins]).then((Results res) { 
+              if (res.insertId != null) {
+                updatedStockPrice = true;
+                c.complete(true);
+              }
+              else {
+                c.completeError("Didnt insert");
+              }
+            });
+          }
+        });
+      });
+    }
     return c.future;
   }
  
@@ -92,7 +117,7 @@ class Stock {
   
   static Future<bool> init (DatabaseHandler dbh) {
     Completer c = new Completer();
-    dbh.query("SELECT stock_id, acro, name, benefit, benefit_shares, min, minDate,max, maxDate, lastUpdate, info, currentCost FROM `general`").then((Results res) { 
+    dbh.query("SELECT stock_id, acro, name, benefit, benefit_shares, min, minDate,max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares FROM `general`").then((Results res) { 
                 res.listen((Row stockRow) { 
                   Stock s = new Stock(stockRow[0]);
                   s.acronym = stockRow[1].toString();
@@ -106,6 +131,8 @@ class Stock {
                   s.lastUpdate = new DateTime.fromMillisecondsSinceEpoch(stockRow[9] == null ? 0 : stockRow[6]);
                   s.info = stockRow[10].toString();
                   s.currentPrice = stockRow[11];
+                  s.sharesForSale = stockRow[12];
+                  s.totalShares = stockRow[13];
                 }).onDone(() { 
                   c.complete(true);
                 });
