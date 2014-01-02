@@ -38,8 +38,25 @@ class Stock {
     else return new Stock._create(ID);
   }
   
-  Future<StockData> getTimeRange (DateTime timeFrom, DateTime timeTo) {
-    
+  Future<TimedStockData> getTimeRange (DatabaseHandler dbh, DateTime timeFrom, [DateTime timeTo]) {
+    Completer<TimedStockData> c = new Completer();
+    if (TimedStockData.exists(this.id, timeFrom, timeTo)) {
+      c.complete(TimedStockData.get(this.id, timeFrom, timeTo));
+    }
+    else {
+      dbh.prepareExecute("SELECT updateTime, cost, sharesForSale FROM stockprices WHERE stock_id=? AND updateTime >= ? AND updateTime <= ?",[id, timeFrom, (timeTo != null ? timeTo.millisecondsSinceEpoch : new DateTime.now().millisecondsSinceEpoch)])
+        .then((Results res) {
+          TimedStockData tsd = new TimedStockData(id, timeFrom, timeTo);
+          List<StockData> dat = new List<StockData>();
+          res.listen((Row data) { 
+            dat.add(new StockData(new DateTime.fromMillisecondsSinceEpoch(data[0]), data[1], data[2]));
+          }).onDone(() { 
+            tsd._data = dat;
+            c.complete(tsd);
+          });
+        });
+    }
+    return c.future;
   }
   
   Future<bool> fetchLatestData (TornGetter tg) {
@@ -99,6 +116,14 @@ class Stock {
     if (updatedStockPrice == false) {
       DateTime now = new DateTime.now();
       DateTime prev15Mins = new DateTime.fromMillisecondsSinceEpoch((now.millisecondsSinceEpoch - (now.millisecondsSinceEpoch % 900000)));
+      TimedStockData._cache.forEach((String key, TimedStockData data) { 
+        List<String> splitKey = key.split(":");
+        if (id.toString() == key[0]) {
+          if (key[2] == "true") {
+            data._data.add(new StockData(prev15Mins, currentPrice, sharesForSale));
+          }
+        }
+      });
       dbh.prepareExecute("SELECT COUNT(*) FROM stockprices WHERE stock_id = ? AND updateTime >= ?", [id, prev15Mins.millisecondsSinceEpoch]).then((Results res) { 
         res.first.then((Row row) { 
           if (row[0] == 0) {
@@ -148,11 +173,64 @@ class Stock {
   }
 }
 
-
+class TimedStockData {
+  static Map<String, TimedStockData> _cache = new Map<String, TimedStockData>();
+  DateTime timeFrom;
+  DateTime timeTo;
+  bool flexible = false;
+  List<StockData> _data = new List<StockData>();
+  Timer _destroyer;
+  int stockID = 0;
+  String key = "";
+  
+  List<StockData> get data {
+    if (_destroyer != null) {
+      _destroyer.cancel();
+    }
+    _destroyer = new Timer(new Duration(minutes: 15), this.destroy);
+    return _data;
+  }
+  
+  void destroy () {
+    _cache.remove(key);
+  }
+  
+ 
+  TimedStockData._create (int this.stockID, DateTime this.timeFrom, { DateTime this.timeTo, bool this.flexible }) {
+    this.key = createKey (stockID, timeFrom, timeTo);
+    _cache[key] = this;
+    _destroyer = new Timer(new Duration(minutes: 60), this.destroy);
+  }
+    
+  factory TimedStockData (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+    String key = createKey (stockID, timeFrom, timeTo);
+    if (_cache.containsKey(key)) {
+        return _cache[key];
+    }
+    else return new TimedStockData._create(stockID, timeFrom, timeTo: timeTo, flexible: (timeTo == null ? true : false));
+  }
+  
+  static String createKey (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+    return "$stockID:${timeFrom.millisecondsSinceEpoch}:${timeTo == null ? timeTo.millisecondsSinceEpoch : true}";
+  }
+  static exists (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+    return _cache.containsKey(createKey (stockID, timeFrom, timeTo));
+  }
+  static get (int stockID, DateTime timeFrom, [DateTime timeTo]) {
+    return _cache[createKey (stockID, timeFrom, timeTo)];
+  }
+  toJson () {
+    return { 'stockID': stockID, 'timeFrom': timeFrom.millisecondsSinceEpoch, 'timeTo': (this.flexible == true ? new DateTime.now().millisecondsSinceEpoch : timeTo.millisecondsSinceEpoch), 'flexible': flexible, 'data': _data };
+  }
+}
 class StockData {
-  int time = 0;
+  DateTime time;
   num CPS = 0.0;
-  int sharesAvailable = 0;  
+  num sharesAvailable = 0;  
+  StockData (DateTime this.time, num this.CPS, num this.sharesAvailable);
+  toJson () {
+    return { 'time': time.millisecondsSinceEpoch, 'cps': CPS, 'avail': sharesAvailable };
+  }
 }
 
 
