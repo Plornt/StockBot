@@ -28,9 +28,6 @@ class TornGetter {
       cookies.add(new Cookie("PHPSESSID", PHPSESSID));
     }
   }
-  Future<String> _internalRequestCache (Request req) {
-        
-  }
   Future<String> request (String url, { Map<String, String> postData, needLogin: true}) {
     Completer c = new Completer();
     if (loggedIn || needLogin == false) {
@@ -163,7 +160,91 @@ class TornGetter {
   
 }
 
-String stockCostSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD > TABLE";
+class QueryQueue {
+  List<List<dynamic>> parameters = new List<dynamic>();
+  List<Completer> c = new List<Completer>();
+  QueryQueue();
+  void add (List<dynamic> params, Completer comp) {
+     parameters.add(params);
+     c.add(comp);
+  }
+}
+
+class DatabaseHandler {
+  ConnectionPool _connectionPool;
+
+  /// Caches the query
+  Map<String, Query> _queryCache = new Map<String, Query>();
+  Map<String, QueryQueue> _queue = new Map<String, QueryQueue>();
+
+  DatabaseHandler (this._connectionPool);
+
+  /// Executes a query
+  Future<Results> query(String sql) {
+    return _connectionPool.query(sql);
+  }
+
+  /// Prepares an sql statement and returns the Query ready for execution. Prepared statement is cached.
+  Future<Query> prepare (String sql) {
+    Completer c = new Completer();
+    if (!_queryCache.containsKey(sql)) {
+      _connectionPool.prepare(sql).then((Query E) {
+        _queryCache[sql] = E;
+        _processQueue(E, sql);
+        c.complete(E);
+      }).catchError((e) { c.completeError(e); });
+    }
+    else {
+      print("Using cache");
+      c.complete(_queryCache[sql]);
+    }
+    return c.future;
+  }
+  void _processQueue (Query q, String sql) {
+     if (_queue.containsKey(sql)) {
+       int qL = _queue[sql].parameters.length;
+       QueryQueue curr = _queue[sql];
+       for (int x = 0; x < qL; x++) {
+         q.execute(curr.parameters[x]).then((v) => curr.c[x].complete(v)).catchError((e) => curr.c[x].completeError(e));
+       }
+       _queue.remove(curr);
+     }
+  }
+
+  /// Prepares a sql statement then executes with the supplied parameters and caches the prepared statement.
+  Future<Results> prepareExecute (String sql, List<dynamic> parameters) {
+    Completer c = new Completer();
+    // We want to check if a query is being prepared already
+    // If we do a loop elsewhere and then try to execute, the issue is the prepared
+    // query doesnt get prepared before theyre all sent through
+    // So we end up essentially having a useless cache
+    if (!_queue.containsKey(sql)) {
+      _queue[sql] = new QueryQueue ();
+      this.prepare(sql).then((Query q) {
+        q.execute(parameters).then((E)  => c.complete(E)).catchError((e) => c.completeError(e));
+      }).catchError((e) { c.completeError(e); });
+    }
+    else {
+      _queue[sql].add(parameters, c);
+    }
+    return c.future;
+  }
+
+  /// Returns the number of rows a sql statement returns.
+  Future<int> getNumRows (sql, parameters) {
+    Completer c = new Completer();
+    this.prepareExecute(sql, parameters).then((row) {
+      row.listen((res) {
+        c.complete(res[0]);
+      }, onDone: () {
+        if (!c.isCompleted) c.complete(0);
+      });
+    }).catchError((e) { c.completeError(e); });
+    return c.future;
+  }
+}
+///html/body/div[4]/table/tbody/tr/td[2]/table/tbody/tr[3]/td/table/tbody/tr/td[2]/table/tbody/tr[1]/td[2]
+String stockCostSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD:eq(1) > TABLE > TBODY > TR:eq(0) > TD:eq(1)";
 String acronymSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD > TABLE > TBODY > TR > TD:eq(1)";
 String nameSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > CENTER:eq(0) > FONT:eq(0) > B:eq(0)";
 String infoSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0)";
@@ -187,6 +268,9 @@ class Stock {
   String demand = "";
   String forecast = "";
   bool errored = false;
+  num currentPrice = 0;
+  
+  
   
   Stock._create (this.id) {
     _STOCKS[id] = this;
@@ -199,26 +283,26 @@ class Stock {
     else return new Stock._create(ID);
   }
   
-  Future<StockData> getTimeRange (DateTime timeFrom, timeTo) {
+  Future<StockData> getTimeRange (DateTime timeFrom, DateTime timeTo) {
     
   }
   
-  Future<bool> fetchLatestData (TornGetter tg, DateTime lastUpdate) {
+  Future<bool> fetchLatestData (TornGetter tg) {
     Completer c = new Completer();
+    
     tg.request("http://www.torn.com/stockexchange.php?step=profile&stock=$id").then((data) { 
       Document parsed = parser.parse(data);
-      List<Element> pricesTables = childQuerySelector(parsed.body, stockCostSelector);
-
+      
       try { 
-        // Acronym
+        this.currentPrice =  num.parse(childQuerySelector(parsed.body, stockCostSelector)[0].innerHtml.replaceAll(",", "").replaceAll(r"$", ""), (e) { return 0; });
         this.acronym = childQuerySelector(parsed.body, acronymSelector)[0].innerHtml;    
         this.name = childQuerySelector(parsed.body, nameSelector)[0].innerHtml;  
         this.info = childQuerySelector(parsed.body, infoSelector)[0].innerHtml;  
         this.director = childQuerySelector(parsed.body, directorSelector)[0].innerHtml;  
         this.marketCap = childQuerySelector(parsed.body, marketCapSelector)[0].innerHtml;  
         this.demand = childQuerySelector(parsed.body, demandSelector)[0].innerHtml;
-        this.totalShares = num.parse(childQuerySelector(parsed.body, totalSharesSelector)[0].innerHtml.replaceAll(",", ""), (e) { this.totalShares = 0; });
-        this.sharesForSale = num.parse(childQuerySelector(parsed.body, sharesForSaleSelector)[0].innerHtml.replaceAll(",", ""), (e) { this.sharesForSale = 0; });
+        this.totalShares = num.parse(childQuerySelector(parsed.body, totalSharesSelector)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
+        this.sharesForSale = num.parse(childQuerySelector(parsed.body, sharesForSaleSelector)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
         this.forecast = childQuerySelector(parsed.body, forecastSelector)[0].innerHtml;
   
         c.complete(true);
@@ -230,8 +314,14 @@ class Stock {
     }).catchError(c.completeError);
     return c.future;
   }
+  
+  Future<bool> insertIntoDb () {
+    
+  }
+  
+  
   toJson () {
-    return { 'id': id, 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
+    return { 'id': id, 'currentPrice':currentPrice, 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
   }
 }
 
@@ -308,9 +398,9 @@ void main () {
   for (int i=0; i<=31; i++) {
     if (i == 24) continue;
     Stock stock = new Stock(i);
-    stock.fetchLatestData(tg, new DateTime.now()).then((dat) { 
+    stock.fetchLatestData(tg).then((dat) { 
       stocks.add(stock);
-      print("[${stocks.length}/30] Got data from stockID $i");
+      print("[${stocks.length}/31] Got data from stockID $i");
       if (stocks.length == 31) {
         JsonEncoder encoder = new JsonEncoder();
         print(encoder.convert(stocks));
