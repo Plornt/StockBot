@@ -6,7 +6,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 
-
+class Request {
+  String url = "";
+  Completer c;
+  Map<String, String> postData;
+  Request (this.url, this.postData, this.c);
+}
 class TornGetter {
   String username = "";
   String password = "";
@@ -14,6 +19,8 @@ class TornGetter {
   bool loginFailed = false;
   HttpClient client = new HttpClient();
   bool loggedIn = false;  
+  bool _attemptingLogin = false;
+  List<Request> queued = new List<Request>();
   List<Cookie> cookies = new List<Cookie>();
   TornGetter ({this.username, this.password, this.selfLogin: true, PHPSESSID: ""}) {
     if (PHPSESSID != "") {
@@ -21,37 +28,47 @@ class TornGetter {
       cookies.add(PHPSESSID);
     }
   }
-  
+  Future<String> _internalRequestCache (Request req) {
+        
+  }
   Future<String> request (String url, { Map<String, String> postData, needLogin: true}) {
+    Completer c = new Completer();
     if (loggedIn || needLogin == false) {
-      return _doRequest(url, postData: postData);
+      _doRequest(new Request(url, postData, c));
     }
     else {
-      Completer c = new Completer();
-      if (selfLogin == true) {
-         tryLogin(3, 0).then((bool done) {
-           if (done) {
-               _doRequest(url, postData: postData).then((val) { 
-                c.complete(val);
-              });
-           }
-           else {
-             loginFailed = true;
-             c.completeError("Could not login.");
-           }
-         });
-
+      if (!_attemptingLogin) { 
+        if (selfLogin == true) {
+          _attemptingLogin = true;
+           tryLogin(3, 0).then((bool done) {
+             if (done) {
+                 loginFailed = false;
+                 loggedIn = true;
+                 _attemptingLogin = false;
+                 _doRequest(new Request(url, postData, c));
+                 queued.forEach(_doRequest);
+                 queued = new List<Request>();
+             }
+             else {
+               loginFailed = true;
+               c.completeError("Could not login.");
+             }
+           });
+        }
+        else c.completeError("Could not login.");
       }
-      else c.completeError("Could not login.");
-      return c.future;
+      else queued.add(new Request(url, postData, c));
     }
+
+    return c.future;
   }
   
-  Future<String> _doRequest (String url, { Map<String, String> postData }) {
-    Completer c = new Completer();
+  Future<String> _doRequest (Request req) {
+    String url = req.url;
+    Map<String, String> postData = req.postData;
+    Completer c = req.c;
     void requestSent (HttpClientResponse html) {
       String htmlData = "";
-      print("got data");
       html.transform(new Utf8Decoder(allowMalformed: true)).listen((String data) {
         htmlData += data;
       }).onDone(() {
@@ -59,22 +76,32 @@ class TornGetter {
                  c.complete(htmlData);
         }
         else {
-          tryLogin(3, 0).then((val) { 
-            if (val) {
-              return this._doRequest(url, postData: postData);
-            }
-            else c.completeError("Could not login");
-          });
+          if (this._attemptingLogin != true) {
+            this._attemptingLogin = true;
+            tryLogin(3, 0).then((val) { 
+              if (val) {
+                loginFailed = false;
+                loggedIn = true;
+                _attemptingLogin = false;
+                queued.forEach(_doRequest);
+                queued = new List<Request>();
+                return this._doRequest(req);
+              }
+              else c.completeError("Could not login");
+            });
+          }
+          else {
+            this.queued.add(req);
+          }
         }
       });
     }
     if (postData == null) {
       client.getUrl(Uri.parse(url)).then((HttpClientRequest request) {
-        request.cookies.addAll(cookies);
+        request.cookies.addAll(this.cookies);
         return request.close();
       })
       .then((HttpClientResponse response) { 
-        this.cookies = response.cookies;
         requestSent(response);
       });
     }
@@ -119,10 +146,10 @@ class TornGetter {
   
   Future<bool> login () {
     Completer c = new Completer();
-    this._doRequest("http://www.torn.com/authenticate.php", postData: { 
+    this.request("http://www.torn.com/authenticate.php", postData: { 
       'player': this.username,
       'password': this.password
-    }).then((String htmlData) {
+    }, needLogin: false).then((String htmlData) {
         if (htmlData.contains("You have logged on")) {
           loggedIn = true;
           c.complete(true);
@@ -172,50 +199,59 @@ class Stock {
       String selector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD > TABLE";
       Document parsed = parser.parse(data);
       List<Element> pricesTables = childQuerySelector(parsed.body ,selector);
-      print(parsed.body.innerHtml);
+
       try { 
         // Acronym
-        String acronymSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1)";
+        String acronymSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD > TABLE > TBODY > TR > TD:eq(1)";
         this.acronym = childQuerySelector(parsed.body, acronymSelector)[0].innerHtml;    
-        
+      
         // Name
         String nameSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > CENTER:eq(0) > FONT:eq(0) > B:eq(0)";
         this.name = childQuerySelector(parsed.body, nameSelector)[0].innerHtml;  
-        
+   
         // Info
         String infoSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(1) > TD:eq(0) > CENTER:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0)";
         this.info = childQuerySelector(parsed.body, infoSelector)[0].innerHtml;  
-        
+
+
         // Director
-        String directorSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(1)";
+        String directorSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD > TABLE > TBODY > TR:eq(2) > TD:eq(1)";
         this.director = childQuerySelector(parsed.body, directorSelector)[0].innerHtml;  
         
         // M Cap
-        String marketCapSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(1)";
+        String marketCapSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD:eq(1) > TABLE > TBODY > TR:eq(2) > TD:eq(1)";
         this.marketCap = childQuerySelector(parsed.body, marketCapSelector)[0].innerHtml;  
+     
         
-        // Total S
-        String totalSharesSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";
-        this.totalShares = num.parse(childQuerySelector(parsed.body, totalSharesSelector)[0].innerHtml.replaceAll(",", ""));
-        
-        // S For S
-        String sharesForSaleSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(6) > TD:eq(1)";
-        this.sharesForSale = num.parse(childQuerySelector(parsed.body, sharesForSaleSelector)[0].innerHtml.replaceAll(",", ""));
         // Demand
-        String demandSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";    
+        String demandSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD:eq(0) > TABLE > TBODY > TR:eq(6) > TD:eq(1)";    
         this.demand = childQuerySelector(parsed.body, demandSelector)[0].innerHtml;
         
+        ///html/body/div[4]/table/tbody/tr/td[2]/table/tbody/tr[5]/td/table/tbody/tr/td[1]/table/tbody/tr[7]/td[2]
+                
+        // Total S
+        String totalSharesSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD:eq(1) > TABLE > TBODY > TR:eq(4) > TD:eq(1)";
+        this.totalShares = num.parse(childQuerySelector(parsed.body, totalSharesSelector)[0].innerHtml.replaceAll(",", ""), (e) { this.totalShares = 0; });
+        
+        // S For S
+        String sharesForSaleSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD:eq(1) > TABLE > TBODY > TR:eq(6) > TD:eq(1)";
+        this.sharesForSale = num.parse(childQuerySelector(parsed.body, sharesForSaleSelector)[0].innerHtml.replaceAll(",", ""), (e) { this.sharesForSale = 0; });
+       
         // Forecast 
-        String forecastSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(1) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(2) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:eq(0) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(4) > TD:eq(1)";
+        String forecastSelector = "DIV:eq(3) > TABLE:eq(0) > TBODY:eq(0) > TR:eq(0) > TD:last-child > TABLE:eq(0) > TBODY:eq(0) > TR > TD > TABLE > TBODY > TR > TD > TABLE > TBODY > TR:eq(4) > TD:eq(1)";
         this.forecast = childQuerySelector(parsed.body, forecastSelector)[0].innerHtml;
+  
         c.complete(true);
       }
-      catch (e) {
+      catch (e) {        
         c.completeError(e);
         this.errored = true;
       }
     }).catchError(c.completeError);
     return c.future;
+  }
+  toJson () {
+    return { 'id': id, 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
   }
 }
 
@@ -232,30 +268,51 @@ List<Element> childQuerySelector (Element doc, String selector) {
   List<Element> potentialElements = new List<Element>()..add(doc);
   for (int x = 0; x < splitSelector.length; x++) {  
     List<String> subSelector = splitSelector[x].trim().split(":");
-    int eq;
+    int eq = 0;
+    bool eqSelector = false;
+    bool lastChild = false;
+    bool firstChild = false;
     if (subSelector.length == 2) {
       Match match = EQ_SELECTOR.firstMatch(subSelector[1]);
       if (match != null) {
+        eqSelector = true;
         eq = int.parse(match.group(1));
+      }
+      else if (subSelector[1].toLowerCase() == "last-child") {
+        lastChild = true;
+      }
+      else if (subSelector[1].toLowerCase() == "first-child") {
+        firstChild = true;
       }
       else throw "Only eq is implemented at the moment";
     }
     List<Element> tempElems = new List<Element>();
     potentialElements.forEach((doc) {
       int elemNum = 0;
-      doc.children.forEach((Element child)  { 
+      Element potentialElem;
+      for (int i = 0; i<doc.children.length; i++) {
+        Element child = doc.children[i];
         if (child.tagName == subSelector[0].toLowerCase() || "#${child.id}"== subSelector[0]) {
-          if (eq == null) { 
-            tempElems.add(child);
-          }
-          else {
+          if (eqSelector == true) { 
             if (elemNum == eq) {
               tempElems.add(child);
             }
             elemNum++;
           }
+          else if (lastChild) {
+            potentialElem = child;
+          }
+          else if (firstChild) { 
+            tempElems.add(child);
+            break;
+          }
+          else {
+            tempElems.add(child);
+          }
         }
-      });
+      }
+      if (lastChild) tempElems.add(potentialElem);
+      
     });
     potentialElements = tempElems;
     if (potentialElements.length == 0) {
@@ -266,10 +323,18 @@ List<Element> childQuerySelector (Element doc, String selector) {
 }
 
 void main () {
-  print("Getting");
   TornGetter tg = new TornGetter(username: "Plorntus", password: "roflman1");
-  Stock tcsb = new Stock(1);
-  tcsb.fetchLatestData(tg, new DateTime.now()).then((dat) { 
-    print(tcsb.demand);
-  });
+  List<Stock> stocks = new List<Stock>();
+  for (int i=0; i<=31; i++) {
+    if (i == 24) continue;
+    Stock stock = new Stock(i);
+    stock.fetchLatestData(tg, new DateTime.now()).then((dat) { 
+      stocks.add(stock);
+      print("[${stocks.length}/30] Got data from stockID $i");
+      if (stocks.length == 31) {
+        JsonEncoder encoder = new JsonEncoder();
+        print(encoder.convert(stocks));
+      }
+    });
+  }
 }
