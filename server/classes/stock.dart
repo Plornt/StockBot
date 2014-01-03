@@ -91,7 +91,6 @@ class Stock {
         c.complete(true);
       }
       catch (e) {        
-        c.completeError(e);
         this._errored = true;
       }
     }).catchError(c.completeError);
@@ -111,12 +110,7 @@ class Stock {
                         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
                         "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost), sharesForSale = VALUES(sharesForSale), totalShares = VALUES(totalShares)"
         ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice, sharesForSale, totalShares]).then((Results res) { 
-          if (res.affectedRows < 3) {
             c.complete(true);
-          }
-          else {
-            c.completeError("Affected Rows: ${res.affectedRows}");
-          }
         }).catchError(c.completeError);
     
     return c.future;
@@ -241,7 +235,7 @@ class StockData {
   num sharesAvailable = 0;  
   StockData (DateTime this.time, num this.CPS, num this.sharesAvailable);
   toJson () {
-    return { 'time': time.millisecondsSinceEpoch, 'cps': CPS, 'avail': sharesAvailable };
+    return { 't': time.millisecondsSinceEpoch, 's': CPS, 'a': sharesAvailable };
   }
 }
 

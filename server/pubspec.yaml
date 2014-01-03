@@ -2,4 +2,5 @@ name: StockBot
 description: Server side
 dependencies:
   html5lib: any
+  path: any
   sqljocky: any
