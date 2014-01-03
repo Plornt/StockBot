@@ -153,8 +153,26 @@ class StockServer {
     
   }
   
+  Future<bool> sendFile (HttpRequest request, String filePath) {
+    Completer c = new Completer();
+    final File file = new File('../web/$filePath');
+    file.exists().then((bool found) {
+      if (found) {
+        file.openRead()
+          .pipe(request.response).then((d) { 
+            c.complete(true);
+          })
+            .catchError((e) { c.complete(false); });
+      }
+      else { 
+        c.complete(false);
+      }
+      });
+    return c.future;
+  }
   void _handleRequest (HttpRequest request, PostData data) {
     List<String> path = request.uri.pathSegments;
+    print(path);
     bool handled = false;
     if (path.length > 0) {
       if (path[0] != "") {
@@ -167,11 +185,40 @@ class StockServer {
             params.parameters = path.getRange(2, path.length);
           }
           handled = page.getSubPage(pageSubHandler, params);
+
+          request.response.close();
+        } 
+        else {
+          // Sanitizing the hell out of this path. I dont have time to check how to do this properly.
+           String fullPath = pathLib.joinAll(path);
+           fullPath = pathLib.normalize(fullPath);
+           List<String> splitPath = pathLib.split(fullPath);
+           List<String> sanitizedPath = new List<String>();
+           splitPath.forEach((String pathSeg) { 
+             if (pathSeg != ".." && pathSeg != ".") {
+               sanitizedPath.add(pathSeg);
+             }
+           });
+           fullPath = pathLib.joinAll(sanitizedPath);
+           if (fullPath.length > 0) {
+             sendFile(request, fullPath).then((bool done) { 
+               if (!done) {              
+                 send408(request);
+               }
+             });
+           }
+           else send408(request);
         }
       }
     }
-    if (!handled) send408(request);
-    request.response.close();
+    else {
+      sendFile(request, "index.html").then((bool done) { 
+        print("Found null");
+        if (!done) {
+          send408(request);
+        }
+      });
+    }
   }
   
   void StartServer () {
@@ -193,7 +240,7 @@ class StockServer {
   void send408 (HttpRequest req) { 
     req.response.statusCode = HttpStatus.NOT_ACCEPTABLE;
     req.response.write("No suitable page could be found to handle your request");
-    
+    req.response.close();
   }
 }
 

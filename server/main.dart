@@ -4,7 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:sqljocky/sqljocky.dart';
 import 'package:html5lib/parser.dart' as parser;
 import 'package:html5lib/dom.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as pathLib;
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
@@ -16,7 +16,7 @@ part 'utils/html_utilities.dart';
 part 'utils/torn_getter.dart';
 part 'utils/server_handler.dart';
 
-DatabaseHandler dbh = new DatabaseHandler(new ConnectionPool(host: 'localhost', port: 3307, user: 'root', password: 'killick1', db: 'stocks', max: 5));
+DatabaseHandler dbh = new DatabaseHandler(new ConnectionPool(host: 'localhost', port: 3306, user: 'plornt', password: 'roflman1', db: 'stocks', max: 5));
 void main () {
 
   StockServer server = new StockServer(InternetAddress.ANY_IP_V4, 80);
