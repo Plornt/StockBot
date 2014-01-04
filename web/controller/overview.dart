@@ -36,44 +36,34 @@ class CommaSeparateFilter {
 class StockOverview {
   List<Stock> stocks = new List<Stock>();
   bool get loaded => StockBotModule.loadedStocks;
+  bool get loading => StockBotModule.loadingStocks;
   
   bool desc = true;
   String sortBy = "name";
+  Timer periodicUpdate;
+  DateTime lastRefresh;
   StockOverview () {
      if (!StockBotModule.loggedIn) { 
        window.location.hash = "index";
      }
-     else if (StockBotModule.loadedStocks == false) {
-       StockBotModule.loadedStocks = true;
-       
-       getRequest("/StockInfo/GenericData").then((HttpRequest req) {
-         dynamic obj = JSON.decode(req.responseText);
-         if (obj is List) {
-           List<JsonData> jsD = new List<JsonData>();
-           obj.forEach((Map data) { 
-             JsonData currStock = new JsonData.fromMap(data);
-             Stock tStock = new Stock(currStock.getNum("id").toInt());   
-             tStock.currentPrice = currStock.getNum("currentPrice");
-             tStock.acronym = currStock.getString("acronym");
-             tStock.name = currStock.getString("name");
-             tStock.info = currStock.getString("info");
-             tStock.director = currStock.getString("director");
-             tStock.marketCap = currStock.getString("marketCap");
-             tStock.demand = currStock.getString("demand");
-             tStock.lastUpdate = new DateTime.fromMillisecondsSinceEpoch(currStock.getNum("lastUpdate"), isUtc: true);
-             tStock.totalShares = currStock.getNum("totalShares");
-             tStock.sharesForSale = currStock.getNum("sharesForSale");
-             tStock.forecast = currStock.getString("forecast");
-             tStock.prevPrice = currStock.getNum("prevPrice");
-             StockBotModule.stocks.add(tStock);
-           });
-           stocks = StockBotModule.stocks;
-         }
-       });
+     else {   
+       lastRefresh = new DateTime.now().toUtc();
+       if (periodicUpdate == null) {
+         updateStocks ();
+         periodicUpdate = new Timer.periodic(new Duration(seconds: 10), this.updateStocks);
+       }
      }
-     else {
-        stocks = StockBotModule.stocks;
-     }
+  }
+  
+  void updateStocks ([Timer t]) {
+    StockBotModule.tryStockUpdate().then((bool complete) {
+      stocks = StockBotModule.stocks;
+      lastRefresh = new DateTime.now();
+    }).catchError((e) { 
+      if (t != null) t.cancel();
+      print("Stock update error: $e");
+      // TODO: DISPLAY ERROR SCREEN;
+    });
   }
   
   void resort (String colName) {

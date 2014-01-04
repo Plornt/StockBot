@@ -11,12 +11,60 @@ part 'controller/loading.dart';
 part 'controller/sidebar.dart';
 part 'controller/login.dart';
 part 'controller/overview.dart';
+part 'controller/time_ago.dart';
 
 class StockBotModule extends Module {
   static User user;
   static bool loggedIn = false;
   static bool loadedStocks = false;
+  static bool loadingStocks = false;
   static List<Stock> stocks = new List<Stock>();
+  
+  static Future<bool> tryStockUpdate () {
+    Completer c = new Completer();
+    if (loadingStocks == false && loggedIn == true) {
+      loadingStocks = true;
+      getRequest("/StockInfo/GenericData").then((HttpRequest req) {
+        loadingStocks = false;
+        dynamic obj = JSON.decode(req.responseText);
+        if (obj is List) {
+          List<JsonData> jsD = new List<JsonData>();
+          StockBotModule.stocks = new List<Stock>();
+          obj.forEach((Map data) { 
+            JsonData currStock = new JsonData.fromMap(data);
+            Stock tStock = new Stock(currStock.getNum("id").toInt());   
+            tStock.currentPrice = currStock.getNum("currentPrice");
+            tStock.acronym = currStock.getString("acronym");
+            tStock.name = currStock.getString("name");
+            tStock.info = currStock.getString("info");
+            tStock.director = currStock.getString("director");
+            tStock.marketCap = currStock.getString("marketCap");
+            tStock.demand = currStock.getString("demand");
+            tStock.lastUpdate = new DateTime.fromMillisecondsSinceEpoch(currStock.getNum("lastUpdate"), isUtc: true);
+            tStock.totalShares = currStock.getNum("totalShares");
+            tStock.sharesForSale = currStock.getNum("sharesForSale");
+            tStock.forecast = currStock.getString("forecast");
+            tStock.prevPrice = currStock.getNum("prevPrice");
+            StockBotModule.stocks.add(tStock);
+          });
+          loadedStocks = true;
+          loadingStocks = false;
+          c.complete(true);
+        }
+        else {
+          c.completeError("Value returned by server is not valid");
+        }
+      }).catchError((E) { 
+        c.complete(false);
+        loadingStocks = false;
+      });
+    }
+    else {
+      print(loadingStocks);
+      c.complete(false);
+    }
+    return c.future;
+  }
   
   StockBotModule() {
     factory(NgRoutingUsePushState,
@@ -28,7 +76,11 @@ class StockBotModule extends Module {
     type(StockOverview);
     type(PaddedFilter);
     type(CommaSeparateFilter);
+    type(DurationFilter);
+    type(TimeAgo);
   }
+  
+  
 }
 
 class StockBotRouteInitializer implements RouteInitializer {

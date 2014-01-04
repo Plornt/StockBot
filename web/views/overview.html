@@ -1,6 +1,10 @@
 
-<div class="table-responsive">
-<table stockOverview class="table table-striped">
+<div stockOverview class="table-responsive col-md-10 col-md-offset-1">
+<p class="center-text-vert">
+<span>You are viewing the latest up to date stock data. Data was last updated <b><ago detail-level="4" last-update="{{overview.lastRefresh.millisecondsSinceEpoch}}"></ago> ago</b>.</span> <button ng-click="overview.updateStocks()" type="button" class="pull-right btn btn-default" ng-disabled="overview.loading">Refresh now</button>
+</p>
+<hr>
+<table class="table table-striped">
   <thead>
     <tr>
       <th class="left" ng-click="overview.resort('acronym')" width="5%">Acronym <span ng-if="overview.sortBy == 'acronym'">{{ overview.desc ? "▲" : "▼" }}</span></th>

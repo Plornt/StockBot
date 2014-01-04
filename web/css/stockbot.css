@@ -40,6 +40,15 @@ body {
    
    font-size: 3em;
 }
+p.center-text-vert {
+  width: 100%;
+  display: table; 
+}
+.center-text-vert > span {
+  display: table-cell; 
+  vertical-align: middle; 
+  
+}
 
 td.center, th.center {
   text-align: center;
