@@ -1,0 +1,32 @@
+
+<div class="table-responsive">
+<table stockOverview class="table table-striped">
+  <thead>
+    <tr>
+      <th class="left" ng-click="overview.resort('acronym')" width="5%">Acronym <span ng-if="overview.sortBy == 'acronym'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th ng-click="overview.resort('name')" width="35%">Stock Name <span ng-if="overview.sortBy == 'name'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th ng-click="overview.resort('currentPrice')" width="10%">Current Price <span ng-if="overview.sortBy == 'currentPrice'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('change')" width="5%">Change <span ng-if="overview.sortBy == 'change'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('lastUpdate')" width="10%">Last Update <span ng-if="overview.sortBy == 'lastUpdate'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('sharesAvailable')" width="7.5%">Shares Avail <span ng-if="overview.sortBy == 'sharesAvailable'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('totalShares')" width="7.5%">Total Shares <span ng-if="overview.sortBy == 'totalShares'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('forecast')" width="10%">Forecast <span ng-if="overview.sortBy == 'forecast'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+      <th class="center" ng-click="overview.resort('demand')"  width="10%">Demand <span ng-if="overview.sortBy == 'demand'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr ng-show="overview.loaded"><td colspan="9">Loading data please wait...</td></tr>
+    <tr ng-repeat="stock in overview.stocks">
+      <td class="left">{{stock.acronym}}</td>
+      <td>{{stock.name}}</td>
+      <td>${{stock.currentPrice | number}}</td>
+      <td class="center" ng-class="{'stockChangeSame': stock.change == 0, 'stockChangeDown': stock.change < 0, 'stockChangeUp': stock.change > 0}">{{stock.change <= 0 ? "" : "+"}}{{stock.change | number:4}}</td>
+      <td class="center">{{stock.lastUpdate.hour | paddednumber:2}}:{{stock.lastUpdate.minute | paddednumber:2}}:{{stock.lastUpdate.second | paddednumber:2}}</td>
+      <td class="center">{{stock.sharesForSale | paddednumber:12 | commaseparate}}</td>
+      <td class="center">{{stock.totalShares | paddednumber:12 | commaseparate}}</td>
+      <td class="center" ng-class="{'forecastGood': stock.forecast == 'Good', 'forecastNA': stock.forecast == 'N/A', 'forecastPoor': stock.forecast == 'Poor', 'forecastAverage': stock.forecast == 'Average'}">{{stock.forecast}}</td>
+      <td class="center" ng-class="{'demandHigh': stock.demand == 'High', 'demandNA': stock.demand == 'N/A', 'demandLow': stock.demand == 'Low', 'demandAverage': stock.demand == 'Average'}">{{stock.demand}}</td>
+    </tr>  
+  </tbody>
+</table>
+</div>  

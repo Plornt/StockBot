@@ -1,4 +1,7 @@
 name: StockBot
 description: A sample web application
 dependencies:
+  angular: any
   browser: any
+  http: any
+  logging: any

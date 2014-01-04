@@ -5,17 +5,64 @@
     <meta charset="utf-8">
     <title>StockBot</title>
     <link rel="stylesheet" href="css/stockbot.css">
+    <link rel="stylesheet" href="css/animate.css">
+    
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    
+    <!-- <link rel="stylesheet" href="css/bootstrap-theme.min.css"> -->
+    
+          
   </head>
-  <body>
-    <h1>StockBot</h1>
-    
-    <p>Hello world from Dart!</p>
-    
-    <div id="sample_container_id">
-      <p id="sample_text_id"></p>
+  <body ng-app>
+    <div loading class="angularSlideUpOut" ng-show="loader.loaded">
+       Loading session, please wait...
     </div>
-
-    <script type="application/dart" src="scripts/stockbot.dart"></script>
-    <script src="packages/browser/dart.js"></script>
+    <div ng-cloak>
+      <sidebar ng-bind-route="index">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">Torn Stock Database</a>
+          </div>
+          
+          <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+          <ul class="nav navbar-nav">
+           <li  ng-class="{active: sidebar.activeLink == link}" ng-repeat="link in sidebar.links"><a href="#/{{link.hash}}" ng-click="link.onClick()">{{link.linkName}}</a></li>
+          </ul>
+          
+          
+            <ul class="nav navbar-nav navbar-right">
+              <li class="dropdown" ng-show="!sidebar.loggedIn">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{sidebar.user.username}}'s Account <b class="caret"></b></a>
+                <ul class="dropdown-menu">
+                  <li><a href="#/account/settings">Settings</a></li>
+                  <li ng-if="sidebar.user.apiAllowed"><a href="#/account/apiKeys">Manage API Keys</a></li>
+                  <li><a href="#/account/logout">Logout</a></li>
+                  <li class="divider"></li>
+                  <li ng-if="sidebar.user.isAdmin"><a href="#/account/admin">Admin</a></li>
+                </ul>
+              </li>
+              
+            </ul>
+          </div>
+        </nav>
+      </sidebar>
+      
+      <section  id="mainPage">
+          <ng-view></ng-view>
+      </section>
+     </div>
+    
+    
+    <!-- Creating a javascript proxy in dart to this is going to be a pain :) -->
+    <script src="https://code.jquery.com/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script type="application/dart" src="main.dart"></script>
+    <script src="packages/browser/dart.js"></script>    
   </body>
 </html>

@@ -19,7 +19,7 @@ class Stock {
   num totalShares = 0;
   num sharesForSale = 0;
   num currentPrice = 0;
-  
+  num prevPrice = 0;
   DateTime maxDate;
   num max = 0;
   DateTime minDate;
@@ -68,30 +68,44 @@ class Stock {
     }
     return c.future;
   }
-  
+  int updates = 0;
   Future<bool> fetchLatestData (TornGetter tg) {
     Completer c = new Completer();
-    
+    DateTime now = new DateTime.now();
+    DateTime prev15Mins = new DateTime.fromMillisecondsSinceEpoch((now.millisecondsSinceEpoch - (now.millisecondsSinceEpoch % 900000)));
     tg.request("http://www.torn.com/stockexchange.php?step=profile&stock=$id").then((data) { 
       Document parsed = parser.parse(data);
       
       try { 
+        
         updatedStockPrice = false;
-        this.currentPrice =  num.parse(childQuerySelector(parsed.body, STOCK_SELECTORS.STOCK_COST)[0].innerHtml.replaceAll(",", "").replaceAll(r"$", ""), (e) { return 0; });
+        num newPrice = parseNum(childQuerySelector(parsed.body, STOCK_SELECTORS.STOCK_COST)[0].innerHtml.replaceAll(",", "").replaceAll(r"$", ""), (e) { return 0; });
+        updates++;
+        if (updates == 1) this.prevPrice = this.currentPrice;
+        this.currentPrice =  newPrice;
         this.acronym = childQuerySelector(parsed.body, STOCK_SELECTORS.ACRONYM)[0].innerHtml;    
         this.name = childQuerySelector(parsed.body, STOCK_SELECTORS.NAME)[0].innerHtml;  
         this.info = childQuerySelector(parsed.body, STOCK_SELECTORS.INFO)[0].innerHtml;  
         this.director = childQuerySelector(parsed.body, STOCK_SELECTORS.DIRECTOR)[0].innerHtml;  
         this.marketCap = childQuerySelector(parsed.body, STOCK_SELECTORS.MARKET_CAP)[0].innerHtml;  
         this.demand = childQuerySelector(parsed.body, STOCK_SELECTORS.DEMAND)[0].innerHtml;
-        this.totalShares = num.parse(childQuerySelector(parsed.body, STOCK_SELECTORS.TOTAL_SHARES)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
-        this.sharesForSale = num.parse(childQuerySelector(parsed.body, STOCK_SELECTORS.SHARES_FOR_SALE)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
+        this.totalShares = parseNum (childQuerySelector(parsed.body, STOCK_SELECTORS.TOTAL_SHARES)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
+        this.sharesForSale = parseNum(childQuerySelector(parsed.body, STOCK_SELECTORS.SHARES_FOR_SALE)[0].innerHtml.replaceAll(",", ""), (e) { return 0; });
         this.forecast = childQuerySelector(parsed.body, STOCK_SELECTORS.FORECAST)[0].innerHtml;
-  
+        
+        if (this.min > this.currentPrice) {
+          this.min = this.currentPrice;
+          this.minDate = prev15Mins;
+        }
+        if (this.max < this.currentPrice) {
+          this.max = this.currentPrice;
+          this.maxDate = prev15Mins;
+        }
         c.complete(true);
       }
       catch (e) {        
         this._errored = true;
+        print("Error: $e");        
       }
     }).catchError(c.completeError);
     return c.future;
@@ -99,18 +113,22 @@ class Stock {
   
   Future<bool> updateDB (DatabaseHandler dbh) {
     Completer c = new Completer();
-    Future.wait([updateInfoDatabase(dbh), updateQuarterHourStockPrices(dbh)]).then((List<bool> vals) { 
+    
+    Future.wait([updateInfoDatabase(dbh), updateQuarterHourStockPrices(dbh)]).then((List<bool> vals) {
+      print("Response FROM =========== $id");
       c.complete(vals.every((e) { return e == true; }));
-    });
+    }).catchError(c.completeError);
     return c.future;
   }
   Future<bool> updateInfoDatabase (DatabaseHandler dbh) { 
     Completer c = new Completer();
-    dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
-                        "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost), sharesForSale = VALUES(sharesForSale), totalShares = VALUES(totalShares)"
-        ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice, sharesForSale, totalShares]).then((Results res) { 
+    dbh.prepareExecute("INSERT INTO general (stock_id, acro, name, benefit, benefit_shares, min, minDate, max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares, forecast, demand, prevPrice)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE acro= VALUES(acro), name = VALUES(name), benefit = VALUES(benefit), benefit_shares = VALUES(benefit_shares), "
+                        "min = VALUES(min), minDate = VALUES(minDate), max = VALUES(max), maxDate = VALUES(maxDate), lastUpdate = VALUES(lastUpdate), info = VALUES(info), currentCost = VALUES(currentCost), sharesForSale"
+                        "= VALUES(sharesForSale), totalShares = VALUES(totalShares), forecast = VALUES(forecast), demand = VALUES(demand), prevPrice = VALUES(prevPrice)"
+        ,[id, acronym, name, benefit, benefitShares, min, minDate.millisecondsSinceEpoch, max, maxDate.millisecondsSinceEpoch, lastUpdate.millisecondsSinceEpoch, info, currentPrice, sharesForSale, totalShares, forecast, demand, prevPrice]).then((Results res) { 
             c.complete(true);
+            print("Update inf db $id");
         }).catchError(c.completeError);
     
     return c.future;
@@ -128,34 +146,39 @@ class Stock {
           }
         }
       });
+      this.lastUpdate = now;
       dbh.prepareExecute("SELECT COUNT(*) FROM stockprices WHERE stock_id = ? AND updateTime >= ?", [id, prev15Mins.millisecondsSinceEpoch]).then((Results res) { 
         res.first.then((Row row) { 
           if (row[0] == 0) {
+            print("check row count");
             dbh.prepareExecute("INSERT INTO stockprices (stock_id, cost, totalShares, sharesForSale, updateTime) VALUES (?, ?, ?, ?, ?)",[id, currentPrice, totalShares, sharesForSale, prev15Mins.millisecondsSinceEpoch]).then((Results res) { 
               if (res.insertId != null) {
                 updatedStockPrice = true;
+                updates = 1;
                 c.complete(true);
+                print("update $id");
               }
               else {
+                print("no update $id");
                 c.completeError("Didnt insert");
               }
-            });
+            }).catchError(c.completeError);
           }
           else c.complete(true);
         });
-      });
+      }).catchError(c.completeError);
     }
     else c.complete(true);
     return c.future;
   }
  
   toJson () {
-    return { 'id': id, 'currentPrice':currentPrice, 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
+    return { 'id': id, 'prevPrice': prevPrice, 'currentPrice': currentPrice, 'lastUpdate': (this.lastUpdate != null ? this.lastUpdate.millisecondsSinceEpoch : 0), 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
   }
   
   static Future<bool> init (DatabaseHandler dbh) {
     Completer c = new Completer();
-    dbh.query("SELECT stock_id, acro, name, benefit, benefit_shares, min, minDate,max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares FROM `general`").then((Results res) { 
+    dbh.query("SELECT stock_id, acro, name, benefit, benefit_shares, min, minDate,max, maxDate, lastUpdate, info, currentCost, sharesForSale, totalShares, forecast, demand, prevPrice FROM `general`").then((Results res) { 
                 res.listen((Row stockRow) { 
                   Stock s = new Stock(stockRow[0]);
                   s.acronym = stockRow[1].toString();
@@ -171,6 +194,9 @@ class Stock {
                   s.currentPrice = stockRow[11];
                   s.sharesForSale = stockRow[12];
                   s.totalShares = stockRow[13];
+                  s.forecast = stockRow[14];
+                  s.demand = stockRow[15];
+                  s.prevPrice = stockRow[16];
                 }).onDone(() { 
                   c.complete(true);
                 });

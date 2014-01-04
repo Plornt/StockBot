@@ -3,4 +3,5 @@ description: Server side
 dependencies:
   html5lib: any
   path: any
+dev_dependencies:
   sqljocky: any
