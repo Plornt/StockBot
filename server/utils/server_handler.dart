@@ -13,6 +13,29 @@ class ServerHandler {
     final File file = new File('../web/$filePath');
     file.exists().then((bool found) {
       if (found) {
+        String ext = pathLib.extension(filePath);
+        String mimeType = "text/html";
+        switch (ext) {
+          case ".html":
+            mimeType = "text/html";
+            break;
+          case ".js":
+            mimeType = "text/javascript";
+            break;
+          case ".css":
+            mimeType = "text/css";
+            break;
+          case ".htm":
+            mimeType = "text/html";
+            break;
+          case ".dart":
+            mimeType = "text/dart";
+            break;
+          default:
+            mimeType = "text/$ext";
+            break;
+        }
+        request.response.headers.set("Content-Type", mimeType);
         file.openRead()
           .pipe(request.response).then((d) { 
             c.complete(true);
@@ -37,11 +60,9 @@ class ServerHandler {
           if (path.length >= 2) pageSubHandler = path[1];
           Parameters params = new Parameters();
           if (path.length >= 3) { 
-            params.parameters = path.getRange(2, path.length);
+            params.parameters = path.getRange(2, path.length).toList();
           }
           handled = page.getSubPage(pageSubHandler, params);
-
-          request.response.close();
         } 
         else {
           // Sanitizing the hell out of this path. I dont have time to check how to do this properly.
@@ -98,15 +119,18 @@ class ServerHandler {
     req.response.close();
   }
 }
-num parseNum (String num, [int onError(String s)]) {
-  return double.parse(num,  (String e) {
-    if (onError != null) {
-      return int.parse(num, onError: onError).toDouble();
-    }
-    else {
-      return int.parse(num).toDouble();
-    }
-  });
+num parseNum (String nums, [num onError(String s)]) {
+//  return double.parse(nums,  (String e) {
+//    if (onError != null) {
+//      return int.parse(nums, onError: onError).toDouble();
+//    }
+//    else {
+//      return int.parse(nums).toDouble();
+//    }
+//  });
+  // Uncomment the above when running on an older dart vm
+  
+  return num.parse(nums, onError);
 }
 class Parameters {
   List<String> parameters = new List<String>();

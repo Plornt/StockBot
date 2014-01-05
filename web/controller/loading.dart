@@ -17,7 +17,7 @@ class Loading {
                 data.getBool("active"), data.getBool("isAdmin"), data.getBool("apiAllowed"), data.getString("lastIp"), data.getString("apiKey"), data.getNum("tornID"));
             StockBotModule.user = tempU;
             StockBotModule.loggedIn = true;
-            StockBotModule.tryStockUpdate().then((bool complete) {
+            Stock.fetchAllStockData().then((List<Stock> stocks) {
               loaded = true;
             }).catchError((e) { 
               // TODO: DISPLAY ERROR SCREEN;

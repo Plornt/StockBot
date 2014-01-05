@@ -17,6 +17,10 @@ packages:
     description: browser
     source: hosted
     version: "0.9.0"
+  chart:
+    description: chart
+    source: hosted
+    version: "0.3.6"
   collection:
     description: collection
     source: hosted

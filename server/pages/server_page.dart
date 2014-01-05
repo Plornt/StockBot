@@ -23,6 +23,7 @@ abstract class ServerPage {
   void sendJson (dynamic obj) {
     try {
       String json =  JSON.encode(obj);
+      print("Sending data");
       response.write(json);
       response.close();
     }

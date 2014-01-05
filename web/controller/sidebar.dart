@@ -15,7 +15,7 @@ class Sidebar {
   }
   Sidebar (RouteProvider router) {
     links.add(new SidebarLink("Overview", this, "overview"));
-    links.add(new SidebarLink("Detailed View", this, "detailed"));
+    links.add(new SidebarLink("Detailed View", this, "detailed/0"));
   }
 }
 

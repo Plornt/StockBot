@@ -20,27 +20,31 @@ class DurationFilter {
         timeAgo.write(", ");
       }
       
-      if ((offsetDuration.inHours % 24) > 0 || maxDetail == 2) {
+      if ((offsetDuration.inHours % 24) > 0 && maxDetail >= 2) {
         timeAgo.write((offsetDuration.inHours % 24) % 24);
         timeAgo.write(" hour");
         if (offsetDuration.inHours > 1) timeAgo.write("s");
         timeAgo.write(", ");
       }
-      if ((offsetDuration.inMinutes % 60) > 0 || maxDetail == 3) {
+      if ((offsetDuration.inMinutes % 60) > 0 && maxDetail >= 3) {
         timeAgo.write(offsetDuration.inMinutes % 60);
         timeAgo.write(" minute");
         if ((offsetDuration.inMinutes % 60) > 1) timeAgo.write("s");
         timeAgo.write(", ");
       }
-      if ((offsetDuration.inSeconds % 60) > 0  || maxDetail == 4) {
+      if ((offsetDuration.inSeconds % 60) > 0  && maxDetail >= 4) {
         timeAgo.write(offsetDuration.inSeconds % 60);
         timeAgo.write(" second");
         if ((offsetDuration.inSeconds % 60) > 1) timeAgo.write("s");
         timeAgo.write(", ");
       }
-      
-      return timeAgo.toString().substring(0, timeAgo.toString().length - 2);
-    }
+      if (timeAgo.length > 0) { 
+        return timeAgo.toString().substring(0, timeAgo.toString().length - 2);
+      }
+      else {
+        return "";
+      }
+     }
   }
 }
 
@@ -50,7 +54,7 @@ class DurationFilter {
     template: '{{time.time}}',
     map: const {
       'last-update': '@lastUpdate',
-      'detaillevel': '@detailLevel'
+      'detail-level': '@detailLevel'
     }
 )
 class TimeAgo {
@@ -73,6 +77,7 @@ class TimeAgo {
     if (val !=null) {
       int aL = int.parse(val, onError: (e) { return new DateTime.now().millisecondsSinceEpoch; });
          _lastUpdate  = aL;
+         time = filter.call(_lastUpdate, _detailLevel);
          startTimerNextInterval();
     }
   }

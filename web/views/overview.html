@@ -1,36 +1,49 @@
 
-<div stockOverview class="table-responsive col-md-10 col-md-offset-1">
-<p class="center-text-vert">
-<span>You are viewing the latest up to date stock data. Data was last updated <b><ago detail-level="4" last-update="{{overview.lastRefresh.millisecondsSinceEpoch}}"></ago> ago</b>.</span> <button ng-click="overview.updateStocks()" type="button" class="pull-right btn btn-default" ng-disabled="overview.loading">Refresh now</button>
-</p>
-<hr>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th class="left" ng-click="overview.resort('acronym')" width="5%">Acronym <span ng-if="overview.sortBy == 'acronym'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th ng-click="overview.resort('name')" width="35%">Stock Name <span ng-if="overview.sortBy == 'name'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th ng-click="overview.resort('currentPrice')" width="10%">Current Price <span ng-if="overview.sortBy == 'currentPrice'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('change')" width="5%">Change <span ng-if="overview.sortBy == 'change'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('lastUpdate')" width="10%">Last Update <span ng-if="overview.sortBy == 'lastUpdate'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('sharesAvailable')" width="7.5%">Shares Avail <span ng-if="overview.sortBy == 'sharesAvailable'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('totalShares')" width="7.5%">Total Shares <span ng-if="overview.sortBy == 'totalShares'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('forecast')" width="10%">Forecast <span ng-if="overview.sortBy == 'forecast'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-      <th class="center" ng-click="overview.resort('demand')"  width="10%">Demand <span ng-if="overview.sortBy == 'demand'">{{ overview.desc ? "▲" : "▼" }}</span></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr ng-show="overview.loaded"><td colspan="9">Loading data please wait...</td></tr>
-    <tr ng-repeat="stock in overview.stocks">
-      <td class="left">{{stock.acronym}}</td>
-      <td>{{stock.name}}</td>
-      <td>${{stock.currentPrice | number}}</td>
-      <td class="center" ng-class="{'stockChangeSame': stock.change == 0, 'stockChangeDown': stock.change < 0, 'stockChangeUp': stock.change > 0}">{{stock.change <= 0 ? "" : "+"}}{{stock.change | number:4}}</td>
-      <td class="center">{{stock.lastUpdate.hour | paddednumber:2}}:{{stock.lastUpdate.minute | paddednumber:2}}:{{stock.lastUpdate.second | paddednumber:2}}</td>
-      <td class="center">{{stock.sharesForSale | paddednumber:12 | commaseparate}}</td>
-      <td class="center">{{stock.totalShares | paddednumber:12 | commaseparate}}</td>
-      <td class="center" ng-class="{'forecastGood': stock.forecast == 'Good', 'forecastNA': stock.forecast == 'N/A', 'forecastPoor': stock.forecast == 'Poor', 'forecastAverage': stock.forecast == 'Average'}">{{stock.forecast}}</td>
-      <td class="center" ng-class="{'demandHigh': stock.demand == 'High', 'demandNA': stock.demand == 'N/A', 'demandLow': stock.demand == 'Low', 'demandAverage': stock.demand == 'Average'}">{{stock.demand}}</td>
-    </tr>  
-  </tbody>
-</table>
-</div>  
+<div stockOverview class="table-responsive col-md-10 col-md-offset-1 col-sm-12">
+  <div class="panel panel-default">
+    <div class="panel-heading">Stock Overview</div>
+    <div class="panel-body">
+      <p class="center-text-vert">
+      <span>You are viewing the latest up to date stock data. Data was last updated <b><ago detail-level="4" last-update="{{overview.lastRefresh.millisecondsSinceEpoch}}"></ago> ago</b>.</span> <button ng-click="overview.updateStocks()" type="button" class="pull-right btn btn-default" ng-disabled="overview.loading">Refresh now</button>
+      </p>
+    </div>
+    
+    <table class="table table-hover table-striped">
+      <thead>
+        <tr class="stockFirstRow">
+          <th class="left" ng-click="overview.resort('acronym')" width="5%">Acronym <span ng-if="overview.sortBy == 'acronym'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th ng-click="overview.resort('name')" width="35%">Stock Name <span ng-if="overview.sortBy == 'name'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th ng-click="overview.resort('currentPrice')" width="10%">Current Price <span ng-if="overview.sortBy == 'currentPrice'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" ng-click="overview.resort('change')" width="5%">+/- <span ng-if="overview.sortBy == 'change'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" width="3%"><abbr title="Last Updated">L/U</abbr> <span ng-if="overview.sortBy == 'lastUpdate'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" ng-click="overview.resort('sharesAvailable')" width="7.5%"><abbr title="Amount of shares available for purchase">Avail</abbr> <span ng-if="overview.sortBy == 'sharesAvailable'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" ng-click="overview.resort('totalShares')" width="7.5%"><abbr title="Total shares a stock has">Total</abbr> <span ng-if="overview.sortBy == 'totalShares'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" ng-click="overview.resort('forecast')" width="8.5%">Forecast <span ng-if="overview.sortBy == 'forecast'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" ng-click="overview.resort('demand')"  width="8.5%">Demand <span ng-if="overview.sortBy == 'demand'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" width="5%" ng-click="overview.resort('weight')" ><abbr title="Weight">W</abbr> <span ng-if="overview.sortBy == 'weight'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+          <th class="center" width="5%" ng-click="overview.resort('potential')" ><abbr title="Potential">P</abbr> <span ng-if="overview.sortBy == 'potential'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+        </tr>
+        <tr>
+          <th colspan="9"></th>
+          <th class="center" ng-click="overview.resort('combined')"  colspan="2">Combined <span ng-if="overview.sortBy == 'combined'">{{ overview.desc ? "▲" : "▼" }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-show="overview.loaded"><td colspan="9">Loading data please wait...</td></tr>
+        <tr ng-click="stock.click()" ng-repeat="stock in overview.stocks">
+          <td class="left">{{stock.acronym}}</td>
+          <td><a target="_blank" href="http://www.torn.com/stockexchange.php?step=profile&stock={{stock.id}}">{{stock.name}}</a></td>
+          <td>{{stock.currentPrice | number:3}}</td>
+          <td class="center" ng-class="{'stockChangeSame': stock.change == 0, 'stockChangeDown': stock.change < 0, 'stockChangeUp': stock.change > 0}">{{stock.change <= 0 ? "" : "+"}}{{stock.change | number:4}}</td>
+          <td class="center">{{stock.lastUpdate.hour | paddednumber:2}}:{{stock.lastUpdate.minute | paddednumber:2}}</td>
+          <td class="center">{{stock.sharesForSale | paddednumber:12 | commaseparate}}</td>
+          <td class="center">{{stock.totalShares | paddednumber:12 | commaseparate}}</td>
+          <td class="center" ng-class="{'forecastVeryPoor': stock.forecast == 'Very Poor', 'forecastVeryGood': stock.forecast == 'Very Good', 'forecastGood': stock.forecast == 'Good', 'forecastNA': stock.forecast == 'N/A', 'forecastPoor': stock.forecast == 'Poor', 'forecastAverage': stock.forecast == 'Average'}">{{stock.forecast}}</td>
+          <td class="center" ng-class="{'demandHigh': stock.demand == 'High', 'demandNA': stock.demand == 'N/A', 'demandLow': stock.demand == 'Low', 'demandAverage': stock.demand == 'Average'}">{{stock.demand}}</td>
+          <td class="right">{{stock.weight | number:2}}%</td>
+          <td class="right">{{stock.potential | number:2}}%</td>
+        </tr>  
+      </tbody>
+    </table>
+  </div>  
+</div>

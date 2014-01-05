@@ -35,43 +35,44 @@ class CommaSeparateFilter {
 )
 class StockOverview {
   List<Stock> stocks = new List<Stock>();
-  bool get loaded => StockBotModule.loadedStocks;
-  bool get loading => StockBotModule.loadingStocks;
+  bool get loaded => Stock.loadedStocks;
+  bool get loading => Stock.loadingStocks;
   
   bool desc = true;
-  String sortBy = "name";
+  String sortBy = "id";
   Timer periodicUpdate;
   DateTime lastRefresh;
-  StockOverview () {
-     if (!StockBotModule.loggedIn) { 
-       window.location.hash = "index";
-     }
-     else {   
+  
+  StockOverview (Scope s) {
+     if (StockBotModule.checkLogin()) {   
        lastRefresh = new DateTime.now().toUtc();
-       if (periodicUpdate == null) {
-         updateStocks ();
-         periodicUpdate = new Timer.periodic(new Duration(seconds: 10), this.updateStocks);
+       if (Stock.loadedStocks == true) {
+         stocks = sort(this.sortBy, Stock.stocks);
        }
+       updateStocks ();
+       periodicUpdate = new Timer.periodic(new Duration(seconds: 10), this.updateStocks);
+       s.$on(r"$destroy", () { 
+         if (periodicUpdate != null) periodicUpdate.cancel();
+       });
      }
   }
   
   void updateStocks ([Timer t]) {
-    StockBotModule.tryStockUpdate().then((bool complete) {
-      stocks = StockBotModule.stocks;
+    Stock.fetchAllStockData().then((List<Stock> fetchedStocks) {
+      stocks = sort(this.sortBy, fetchedStocks);
       lastRefresh = new DateTime.now();
     }).catchError((e) { 
       if (t != null) t.cancel();
-      print("Stock update error: $e");
-      // TODO: DISPLAY ERROR SCREEN;
+      
     });
   }
-  
-  void resort (String colName) {
-    if (colName == sortBy) { desc = !desc; }
-    else desc = true;
+  List<Stock> sort(String colName, List<Stock> tempS) {
     this.sortBy = colName;
-    List<Stock> tempS = stocks;
+    tempS.sort((Stock elem1, Stock elem2) { return elem1.id - elem2.id; });
     switch (colName) {
+      case "id":
+        tempS.sort((Stock elem1, Stock elem2) { return elem1.id - elem2.id; });
+        break;
       case "acronym":
         tempS.sort((Stock elem1, Stock elem2) { return elem1.acronym.compareTo(elem2.acronym); });
         break;
@@ -99,12 +100,25 @@ class StockOverview {
       case "demand":
         tempS.sort((Stock elem1, Stock elem2) { return demandSorter (elem1.demand) - demandSorter (elem2.demand); });
         break;
-        
+      case "weight":
+        tempS.sort((Stock elem1, Stock elem2) { return elem1.weight - elem2.weight; });
+        break;
+      case "potential":
+        tempS.sort((Stock elem1, Stock elem2) { return elem1.potential - elem2.potential; });
+        break;
+      case "combined":
+        tempS.sort((Stock elem1, Stock elem2) { return elem1.wpcombine - elem2.wpcombine; });
+        break;
     }
-    if (desc == true) {
+    if (desc != true) {
       tempS = tempS.reversed.toList();
     }
-    stocks = tempS;
+    return tempS;
+  }
+  void resort (String colName) {
+    if (colName == sortBy) { desc = !desc; }
+    else desc = true;
+    stocks = this.sort(colName, stocks);
   }
 }
 
@@ -112,7 +126,10 @@ class StockOverview {
 int demandSorter (String demand) {
   switch (demand) {
     case "N/A":
-      return 0;
+      return -1;
+      break;
+    case "Very Good":
+      return 4;
       break;
     case "High":
       return 3;
@@ -129,5 +146,8 @@ int demandSorter (String demand) {
     case "Low":
       return 1;
       break;
+    case "Very Poor":
+      return 0;
+    break;
   }
 }

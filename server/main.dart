@@ -35,7 +35,7 @@ void main () {
 
   Stock.init(dbh).then((done) { 
     refreshData(tg);
-    new Timer.periodic(new Duration(minutes: 5),(A) { 
+    new Timer.periodic(new Duration(minutes: 2),(A) { 
       refreshData(tg);
     });
   });

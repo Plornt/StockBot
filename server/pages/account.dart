@@ -5,8 +5,9 @@ class Account extends ServerPage {
  bool getSubPage (String page, Parameters parameters) { 
    if (page == "Login") {
      login(postData.get("username"), postData.get("password"));
+     return true;
    }
-   return true;
+   return false;
  }
  
  void login(String username, String password) {

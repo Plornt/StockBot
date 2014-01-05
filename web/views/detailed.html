@@ -1,0 +1,70 @@
+<div detailed-overview class="col-md-10 col-md-offset-1 col-sm-12">
+
+  <div ng-if="!stockview.loaded">
+    Loading...
+  </div>
+   <ol class="breadcrumb">
+      <li><a href="#/">Home</a></li>
+      <li><a href="#/detailed/0">Detailed Stock View</a></li>
+      <li><div class="dropdown" style="min-width: 300px; display: inline-block;">
+        <button href="#" style="min-width: 300px; display: inline-block;" class="btn dropdown-toggle" class="dropdown-toggle" data-toggle="dropdown">{{stockview.stock.name}} 
+        <b class="caret"></b>
+        </button>
+        <ul class="dropdown-menu">
+          <li ng-repeat="stock in stockview.allStocks"><a href="#/detailed/{{stock.id}}">{{stock.name}}</a></li>
+        </ul>
+      </div></li>
+      
+    </ol>
+  <div ng-cloak ng-if="stockview.loaded" class="panel panel-default">
+    <!-- Default panel contents -->
+    <div class="panel-body">
+      <div> 
+        <div class="well well-lg" style="min-width:100%; min-height: 500px;">
+          <chartview style="min-width:100%; min-height: 500px;" date-from="{{stockview.dateFrom}}" date-to="{{stockview.dateTo}}" stock-id="{{stockview.stockId}}"></chartview>
+        </div>
+        <div style="display:table; width:100%;">
+         <div class="well well-lg" style="display:table-cell; vertical-align:top; width:98%;" >
+          <table class="table table-striped">
+            <thead>
+              <tr><th colspan="2">General Stock Information</th></tr>
+            </thead>
+            <tbody>
+              <tr> <th width="20%">Name</th> <td>{{stockview.stock.name}}</td></tr>
+              <tr> <th>Director</th> <td>{{stockview.stock.director}}</td></tr>
+              <tr> <th>Current Price</th> <td>${{stockview.stock.currentPrice}} ({{(stockview.stock.change ? stockview.stock.change : 0) <= 0 ? "" : "+"}}{{stockview.stock.change | number:3}})</td></tr>
+              <tr> <th>Shares</th> <td>{{stockview.stock.totalShares | number}} shares (${{((stockview.stock.currentPrice ? stockview.stock.currentPrice : 0) * (stockview.stock.totalShares ? stockview.stock.totalShares : 0)) | number:2}})</td></tr>
+              <tr> <th>Available</th> <td>{{stockview.stock.sharesForSale | number}} shares (${{((stockview.stock.currentPrice ? stockview.stock.currentPrice : 0) * (stockview.stock.sharesForSale ? stockview.stock.sharesForSale : 0)) | number:2}})</td></tr>
+              <tr> <th>Benefit</th> <td>{{stockview.stock.benefitShares | number }} shares (${{((stockview.stock.currentPrice ? stockview.stock.currentPrice : 0) * (stockview.stock.benefitShares ? stockview.stock.benefitShares : 0)) | number:2}})</td></tr>
+              <tr> <th></th> <td>{{stockview.stock.benefit}}</td></tr>
+              <tr> <th>Historic Min</th> <td>{{stockview.stock.min | number:3}} (<b><ago detail-level="3" last-update="{{stockview.stock.minDate.millisecondsSinceEpoch}}"></ago> ago</b>)</td></tr>
+              <tr> <th>Historic Max</th> <td>{{stockview.stock.max | number:3}} (<b><ago detail-level="3" last-update="{{stockview.stock.maxDate.millisecondsSinceEpoch}}"></ago> ago</b>)</td></tr>
+              <tr> <th>Weight</th> <td>{{ stockview.stock.weight | number:2 }}%</td></tr>
+              <tr> <th>Potential</th> <td>{{ stockview.stock.potential | number:2 }}%</td></tr>
+            </tbody>
+          </table>
+         </div> 
+         <div style="display: table-cell; width:2%;">
+         
+         
+         </div>
+         <div class="well well-lg" style="display:table-cell;"> 
+          <img ng-cloak ng-src="http://www.torn.com/images/stockmarket/big/{{ stockview.stockId }}big.jpg" />
+          <div class="well" ng-bind-html="{{stockview.stock.info}}">{{stockview.stock.info}}</div> 
+         </div>
+        </div>
+      </div>
+      
+    </div>
+    <table class="table table-striped">
+      <thead>
+        <tr> <th>Stock data for the previous 7 days...</th></tr>
+        <tr> <th>Stock data for the previous 7 days...</th></tr>
+      </thead>
+      <tbody>
+      <tr> <td>Test2</td></tr>
+      <tr> <td>Test2</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

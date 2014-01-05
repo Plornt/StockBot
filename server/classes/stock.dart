@@ -25,6 +25,13 @@ class Stock {
   DateTime minDate;
   num min = 0;
   bool updatedStockPrice = false;
+  num get weight {
+    num test = 100* (this.currentPrice - this.min)/(this.max - this.min);
+    return test > 0 ? test : 0.00;
+  }
+  num get potential {
+    return (100*((this.max - this.currentPrice)/ this.min));
+  }
   DateTime lastUpdate;
   
   Stock._create (this.id) {
@@ -51,20 +58,21 @@ class Stock {
       c.complete(TimedStockData.get(this.id, timeFrom, timeTo));
     }
     else {
-      dbh.prepareExecute("SELECT updateTime, cost, sharesForSale FROM stockprices WHERE stock_id=? AND updateTime >= ? AND updateTime <= ?",[id, timeFrom.millisecondsSinceEpoch, (timeTo != null ? timeTo.millisecondsSinceEpoch : new DateTime.now().millisecondsSinceEpoch)])
+      print("Getting data from database");
+      dbh.prepareExecute("SELECT updateTime, cost, sharesForSale, totalShares FROM stockprices WHERE stock_id=? AND updateTime >= ? AND updateTime <= ?",[id, timeFrom.millisecondsSinceEpoch, (timeTo != null ? timeTo.millisecondsSinceEpoch : new DateTime.now().millisecondsSinceEpoch)])
         .then((Results res) {
           TimedStockData tsd = new TimedStockData(id, timeFrom, timeTo);
           List<StockData> dat = new List<StockData>();
           print("Retreiving Data");
           res.listen((Row data) {
             print("A row!");
-            dat.add(new StockData(new DateTime.fromMillisecondsSinceEpoch(data[0]), data[1], data[2]));
+            dat.add(new StockData(new DateTime.fromMillisecondsSinceEpoch(data[0]), data[1], data[2], data[3]));
           }).onDone(() { 
             tsd._data = dat;
             print("Added data ${dat.length}");
             c.complete(tsd);
           });
-        });
+        }).catchError(c.completeError);
     }
     return c.future;
   }
@@ -142,7 +150,7 @@ class Stock {
         List<String> splitKey = key.split(":");
         if (id.toString() == key[0]) {
           if (key[2] == "true") {
-            data._data.add(new StockData(prev15Mins, currentPrice, sharesForSale));
+            data._data.add(new StockData(prev15Mins, currentPrice, sharesForSale, totalShares));
           }
         }
       });
@@ -173,7 +181,7 @@ class Stock {
   }
  
   toJson () {
-    return { 'id': id, 'prevPrice': prevPrice, 'currentPrice': currentPrice, 'lastUpdate': (this.lastUpdate != null ? this.lastUpdate.millisecondsSinceEpoch : 0), 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
+    return { 'id': id, 'max': max, 'min': min, 'maxDate': maxDate.millisecondsSinceEpoch, 'minDate': minDate.millisecondsSinceEpoch, 'benefit': benefit, 'benefitShares': benefitShares, 'weight': weight, 'potential': potential, 'prevPrice': prevPrice, 'currentPrice': currentPrice, 'lastUpdate': (this.lastUpdate != null ? this.lastUpdate.millisecondsSinceEpoch : 0), 'acronym': this.acronym, 'name': this.name, 'info': this.info, 'director': this.director, 'marketCap': this.marketCap, 'demand': this.demand, 'totalShares': this.totalShares, 'sharesForSale': this.sharesForSale, 'forecast': this.forecast };
   }
   
   static Future<bool> init (DatabaseHandler dbh) {
@@ -227,7 +235,7 @@ class TimedStockData {
     _cache.remove(key);
   }
   
- 
+  
   TimedStockData._create (int this.stockID, DateTime this.timeFrom, { DateTime this.timeTo, bool this.flexible }) {
     this.key = createKey (stockID, timeFrom, timeTo);
     _cache[key] = this;
@@ -259,9 +267,10 @@ class StockData {
   DateTime time;
   num CPS = 0.0;
   num sharesAvailable = 0;  
-  StockData (DateTime this.time, num this.CPS, num this.sharesAvailable);
+  num totalShares = 0;
+  StockData (DateTime this.time, num this.CPS, num this.sharesAvailable, num this.totalShares);
   toJson () {
-    return { 't': time.millisecondsSinceEpoch, 's': CPS, 'a': sharesAvailable };
+    return [ time.millisecondsSinceEpoch,  CPS, sharesAvailable, totalShares];
   }
 }
 

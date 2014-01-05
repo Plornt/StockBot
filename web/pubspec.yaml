@@ -3,5 +3,6 @@ description: A sample web application
 dependencies:
   angular: any
   browser: any
+  chart: any
   http: any
   logging: any

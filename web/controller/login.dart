@@ -38,7 +38,9 @@ class Login {
                 data.getBool("active"), data.getBool("isAdmin"), data.getBool("apiAllowed"), data.getString("lastIp"), data.getString("apiKey"), data.getNum("tornID"));
             StockBotModule.user = tempU;
             StockBotModule.loggedIn = true;
-            window.location.hash = "/overview";
+            Stock.fetchAllStockData().then((d) {
+              window.location.hash = "/overview";
+            });
         }
         else addError(data.getString("error"));
       });

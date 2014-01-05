@@ -11,7 +11,9 @@ body {
 [ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
   display: none !important;
 }
-
+.stockFirstRow > th {
+  border: none !important;
+}
 [loading] {
   
   position:absolute;
@@ -37,7 +39,7 @@ body {
    width: 100%;
    background-color: #101010;
    color:#999;
-   
+   z-index: 999;
    font-size: 3em;
 }
 p.center-text-vert {
@@ -63,15 +65,33 @@ td.left, th.left {
   margin-right: 15px !important;
 }
 
+th[ng-click] {
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
 .forecastNA, .demandNA, .stockChangeSame {
-  background-color: #eeeee !important;
+  background-color: #FCF8B8 !important;
 }
 .forecastAverage, .demandAverage {
-  background-color: #fcf5c5 !important;
+  background-color: #F2E1AA !important;
 }
-.forecastGood, .demandHigh, .stockChangeUp {
-  background-color: #dcf99f !important;
+.forecastGood, .demandHigh {
+  background-color: #DFF5A2 !important;
 }
-.forecastPoor, .demandLow, .stockChangeDown {
+.forecastPoor, .demandLow {
   background-color: #f9bf9f !important;
+}
+
+.forecastVeryGood, .stockChangeUp {
+  background-color: #ADED7B !important;  
+}
+
+.forecastVeryPoor, .stockChangeDown {
+  /*Very Poor*/
+  background-color: #EB7F7F !important;  
 }
